@@ -185,7 +185,8 @@ public class KnightCamp implements FactoryBean {
 运行看看：
 ```Java
 public class SpringLearning1Application {  
-    public static void main(String[] args) {  
+    public static void main(String[] args) {
+	    // 由于我们选择XML文件配置Bean，故采用ClassPathXmlApplicationContext作为应用上下文
         ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("beans.xml");  
         BraveKnight knight = (BraveKnight) context.getBean("knight");  
   
