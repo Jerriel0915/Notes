@@ -229,3 +229,6 @@ public class SpringLearning1Application {
 > [!NOTE]
 > 自动装配只适用于引用类型（如对象、接口等），基础类型（如 `int`, `boolean`）不能作为 Bean，因此无法自动装配。
 
+下面给出配置文件中Bean相关的属性：
+![Bean属性](https://pic-1371809842.cos.ap-chengdu.myqcloud.com/PicGo/20251019171029990.webp?imageSlim)
+
