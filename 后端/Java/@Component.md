@@ -1,3 +1,12 @@
+---
+tags:
+  - 后端
+  - 面试
+  - Bean
+  - Spring
+  - DI
+  - IoC
+---
 `@Component` 是 Spring 框架中**最核心的注解之一**，它的作用一句话概括就是：
 > **标记一个类为 Spring 的组件，告诉 Spring：“请你帮我创建这个类的实例（bean），并交给容器管理。”**
 

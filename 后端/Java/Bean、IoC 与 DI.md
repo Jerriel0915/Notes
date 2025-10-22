@@ -1,3 +1,14 @@
+---
+tags:
+  - 后端
+  - 面试
+  - Bean
+  - Spring
+  - SpringBoot
+  - Java
+  - IoC
+  - DI
+---
 ## 1. IoC思想
 ### 1.1 什么是 IoC?
 IoC，英文全称**Inversion of Control**，中文翻译为**控制反转**。
