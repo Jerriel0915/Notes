@@ -41,6 +41,8 @@ Spring切面可以应用5种类型的通知：
 - 类加载期：切面在目标类加载到JVM时被织入。这种方式需要特殊的类加载器（ClassLoader），它可以在目标类被引入应用之前增强该目标类的字节码。AspectJ 5的加载时织入（load-time weaving，LTW）就支持以这种方式织入切面。
 - 运行期：切面在应用运行的某个时刻被织入。一般情况下，在织入切面时，AOP容器会为目标对象动态地创建一个**代理对象**。Spring AOP就是以这种方式织入切面的。
 
+ Spring AOP 基于代理，仅支持方法级的连接点，无法像 AspectJ 那样拦截字段、构造器等。
+
 ## 3. Spring AOP工作流程
 1. Spring容器启动；
 2. 读取所有**切面**配置中的切入点。如果只定义了切点，但没有对应的通知与之绑定成切面，那么这个切点就不会被Spring读取；
@@ -130,7 +132,7 @@ public @interface Metric {}
 @Pointcut("within(com.x.y.service..*) && execution(public * *(..)) && @args(com.x.y.aop.Sensitive,..) && @annotation(com.x.y.aop.Metric)")
 public void combo(){}
 ```
-虽然有很多指示器，但只有execution指示器是实际执行匹配的，而其他的指示器都是用来限制匹配的。因此execution指示器是我们在编写切点定义时最主要使用的。
+虽然有很多指示器，但只有`execution` 是最常用、最细粒度的匹配指示器，其他指示器如`@annotation`、`within`、`args`等通常与 `execution` 组合使用，以缩小匹配范围。
 
 ### 4.2 编写切点
 现在有一个接口：
@@ -150,7 +152,8 @@ public interface Performance {
 ![切点表达式](https://pic-1371809842.cos.ap-chengdu.myqcloud.com/PicGo/20251021232825612.webp?imageSlim)
 
 ## 5. 使用注解创建切面
-一个切面大致就像这样：
+### 5.1 切面定义
+一个基本的切面大致就像这样：
 ```Java
 package Concert.Aspect;  
   
@@ -165,22 +168,22 @@ public class Audience {
   
     @Before("performPt()")  
     public void silence() {  
-        System.out.println("Audiences start to silence");  
+        System.out.println("Audience start to silence");  
     }  
   
     @Before("performPt()")  
     public void takeSeats() {  
-        System.out.println("Audiences start to take seats");  
+        System.out.println("Audience start to take seats");  
     }  
   
     @AfterReturning("performPt()")  
     public void applause() {  
-        System.out.println("Audiences start to applause");  
+        System.out.println("Audience start to applause");  
     }  
   
     @AfterThrowing("performPt()")  
     public void beSad() {  
-        System.out.println("Audiences start to be sad");  
+        System.out.println("Audience start to be sad");  
     }  
 }
 ```
@@ -197,8 +200,115 @@ public class SpringConfig {
 
 经过这个步骤，就可以在`perform()`方法被调用时自动执行这些逻辑了：
 ```Console
-Audiences start to silence
-Audiences start to take seats
+Audience start to silence
+Audience start to take seats
 Performer start to perform
-Audiences start to applause
+Audience start to applause
 ```
+
+### 5.2 原方法的拦截
+之前提到过，Spring切面中总有5种不同的通知类型，其中`@Around`环绕通知的功能最为强大，也最常在实际中使用。带有`@Around`的通知执行时可以简单分为三个阶段：原方法执行前，原方法执行，原方法执行后。因此使用`@Around`可以很轻松地做到对原方法的拦截，从而实现诸如功能扩展，参数校验与修改等功能。
+比如上述`Audience`类中的前置通知和后置通知可以整合为环绕通知：
+```Java
+@Around("performPt()")  
+public Object watch(ProceedingJoinPoint pjp) throws Throwable {  
+    System.out.println("Audience start to silence");  
+    System.out.println("Audience start to take seats");  
+    try {  
+        pjp.proceed();  
+    } catch (Throwable throwable) {  
+        System.out.println("Audience start to be sad");  
+        throw   throwable;  
+    }  
+    System.out.println("Audience start to applause");  
+    return null;  
+}
+```
+环绕通知的书写还是应该遵循一些规范的。首先能注意到，相比于其他的通知，环绕通知多了一个类型为`ProceedingJoinPoint`的参数，它包含了aop代理链执行所需要的必要信息如切入点的对象，方法，属性等。
+方法应该向上抛出一个异常，这是因为程序编译时无法确定被代理bean的方法是否会抛出异常；同样的，方法还需要返回值，因为也同样无法确定原方法是否包含返回值。并且环绕通知必须返回 `pjp.proceed()` 的结果，否则原方法的返回值将被丢失。
+`pjp.proceed()`的作用是调用原方法，不要忘记了，通知的核心职责是增强原方法行为，而非替代它。
+
+### 5.3 结合反射
+Spring AOP结合反射的使用可以变得更加强大。
+```Java
+@Component  
+public class Performer implements Performance{  
+    private Integer score;  
+  
+    @Override  
+    public void perform() {  
+        System.out.println("Performer start to perform");  
+    }  
+  
+    public void setScore(Integer score) {  
+        this.score = score;  
+    }  
+  
+    public int getScore() {  
+        return score;  
+    }  
+}
+
+// Audience类中
+@Around("performPt()")  
+public Object appraise(ProceedingJoinPoint joinPoint) throws Throwable {  
+    joinPoint.proceed();  
+  
+    Object object = joinPoint.getTarget();  
+    Method method = object.getClass().getMethod("setScore", Integer.class);  
+    Integer i = new Random().nextInt(100) + 1;  
+  
+    method.invoke(object, i);  
+  
+    return null;  
+}
+```
+Main类：
+```Java
+public static void main(String[] args) {  
+        ApplicationContext context = new AnnotationConfigApplicationContext(SpringConfig.class);  
+        Performer performer = context.getBean(Performer.class);  
+        performer.perform();  
+
+        System.out.println(performer.getScore());  
+	}
+```
+结果：
+```Console
+Audience start to silence
+Audience start to take seats
+Performer start to perform
+Audience start to applause
+58
+```
+上述例子展示了使用反射，实现观众对演出者的随机评分。
+
+但需要强调的是，Spring AOP的目的就是减少代码中反射的使用，此示例仅用于演示反射能力，实际开发中应避免直接操作目标对象内部状态，以保持封装性和可维护性。
+
+### 5.4 处理通知中的参数
+到目前为止，我们的切面都很简单，没有任何参数。但实际项目中，往往还需要对原方法的参数做一些处理，比如空指针校验、登录合法性校验，去除字符串中的空格：
+```Java
+public class DataAdvice{
+	@Pointcut("execution(boolean *.*.service.*Service.*(*,*))")
+	private void servicePt(){}
+	
+	@Around("DataAdvice.servicePt()")
+	public Object trimStr(ProceedingJoinPoint pjp) throws Throwable {
+			Object[] args = pjp.getArgs();
+			for (int i = 0 ; i < args.length; i++) {
+			//判断参数是不是字符串
+			if (args[i].getclass().equals(String.class))
+				// trim() 处理
+				args[i] = args[i].toString().trim();
+		}
+		// 回调原方法，此时参数已被修改
+		Object ret = pjp.proceed(args);
+		return ret;
+	}
+}
+```
+`proceed()`方法可以接受多个参数：
+```Java
+Object proceed(Object[] var1) throws Throwable;
+```
+还注意到`ProceedingJoinPoint`还有方法`getArgs()`可以获取到原方法被调用时的入参，因此二者的结合便可以实现将原方法的参数“抽出来”，做一些修改后再“放回去”。
