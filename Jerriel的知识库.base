@@ -1,0 +1,14 @@
+views:
+  - type: table
+    name: 表格
+    filters:
+      not:
+        - file.ext == "base"
+    order:
+      - file.name
+      - file.ext
+      - file.size
+      - file.ctime
+      - file.mtime
+      - file.tags
+    sort: []
