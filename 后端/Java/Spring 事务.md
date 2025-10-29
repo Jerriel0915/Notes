@@ -1,4 +1,5 @@
 ## 1. 为什么需要事务
+
 项目中往往会存在一些需要原子化操作的业务，一个经典例子就是转账——当转账这个操作发生时，它要么必须完成，要么就失败完全不发生。
 比如下面这个例子：
 ```Java
@@ -54,6 +55,7 @@ public class UserServiceTest extends TestCase {
 可以看到这种后果是灾难性的——A账户的钱转出了，但是B账户却因为系统错误没有收到任何入账！
 
 ## 2. 什么是事务
+
 **事务是逻辑上的一组操作，要么都执行，要么都不执行。**
 
 事务是具有 ACID 性质的：
@@ -64,6 +66,7 @@ public class UserServiceTest extends TestCase {
 只有保证了事务的持久性、原子性、隔离性之后，一致性才能得到保障。
 
 ## 3. 在Spring中引入事务
+
 > 程序中的事务能否生效，数据库引擎是否支持事务是关键。比如常用的 MySQL 数据库默认使用支持事务的 **innodb**引擎。但是，如果把数据库引擎变为 **myisam**，那么程序也就不再支持事务了！
 
 推荐使用注解`@Transactional`的方式引入事务，这样做的代码侵入性最小。
@@ -125,6 +128,7 @@ public class jdbcConfig {
 事务的加入做到了我们之前提到的**ACID**性质。
 
 ## 4. TransactionDefinition：事务属性
+
 Spring中并不会直接管理事务的实现，而是提供多种事务管理器，其中一个便是在之前配置类中写到的`PlatformTransactionManager`。
 
 通过这个接口，Spring为各个平台提供对应的事务管理器，如：JDBC(`DataSourceTransactionManager`)、Hibernate(`HibernateTransactionManager`)、JPA(`JpaTransactionManager`)等，但是具体的实现就是各个平台自己的事情了。
@@ -155,6 +159,7 @@ public interface PlatformTransactionManager extends TransactionManager {
 - 事务超时
 
 ### 4.1 事务传播
+
 **事务传播行为是为了解决业务层方法之间互相调用的事务问题**。
 
 当事务方法被另一个事务方法调用时，必须指定事务应该如何传播。例如：方法可能继续在现有事务中运行，也可能开启一个新事务，并在自己的事务中运行。
@@ -276,6 +281,8 @@ public void printLog(String msg) {
 }
 >```
 >是会将`printlog()`方法一同回滚的。
+>
+>这是因为Spring AOP的代理对象的原理导致的，Spring会在运行的时候为带有 `@Transactional` 注解的方法生成代理对象，代理对象能够拦截外部的方法调用并处理事务，但的代理对象内部的方法调用直接使用`this`调用，不会经过拦截，事务也就失效了。
 
 #### 4.1.3 `PROPAGATION_NESTED`
 如果当前存在事务，则创建一个事务作为当前事务的嵌套事务执行； 如果当前没有事务，就执行与`PROPAGATION_REQUIRED`类似的操作。也就是说：
@@ -296,3 +303,48 @@ public void printLog(String msg) {
 ![事务汇总](https://pic-1371809842.cos.ap-chengdu.myqcloud.com/PicGo/20251029182949825.webp?imageSlim)
 具体讲解可以看这个视频：[黑马程序员](https://www.bilibili.com/video/BV1Fi4y1S7ix?p=42&vd_source=367f9dfa83a55e4607b96388b5b70009)
 也可以通过这个链接了解更多事务相关内容：[Spring 事务详解 | JavaGuide](https://javaguide.cn/system-design/framework/spring/spring-transaction.html#transactiondefinition-%E4%BA%8B%E5%8A%A1%E5%B1%9E%E6%80%A7)
+
+### 4.2 事务超时属性
+
+所谓事务超时，就是指一个事务所允许执行的最长时间，如果超过该时间限制但事务还没有完成，则自动回滚事务。在 `TransactionDefinition` 中以 int 的值来表示超时时间，其单位是秒，默认值为-1，这表示事务的超时时间取决于底层事务系统或者没有超时时间。
+
+### 4.3 事务只读属性
+
+```java
+package org.springframework.transaction;
+
+import org.springframework.lang.Nullable;
+
+public interface TransactionDefinition {
+    ......
+    // 返回是否为只读事务，默认值为 false
+    boolean isReadOnly();
+
+}
+```
+对于只有读取数据查询的事务，可以指定事务类型为 `readonly`，即只读事务。只读事务不涉及数据的修改，数据库会提供一些优化手段，适合用在有多条数据库查询操作的方法中。
+
+通常应用在需要多次查询的业务中，例如统计调查，报表查询，在这种场景下，多条查询 SQL 必须保证整体的读一致性。否则，在前条 SQL 查询之后，后条 SQL 查询之前，数据被其他用户改变，则该次整体的统计查询将会出现读数据不一致的状态，此时，应该启用事务支持。
+
+### 4.4 事务回滚规则
+
+实物回滚规则定义了哪些异常会导致事务回滚而哪些不会。默认情况下，事务只有遇到运行期异常（`RuntimeException` 的子类）时才会回滚，`Error` 也会导致事务回滚，但是，在遇到检查型（Checked）异常时不会回滚。
+
+如果需要回滚定义的特定的异常类型的话，可以这样：
+```java
+@Transactional(rollbackFor= MyException.class)
+```
+
+## 5. `@Transactional`注解使用
+
+通常将`@Transactional`应用在具体方法上，不推荐在接口上使用。
+
+> [!TIP] 注意
+> `@Transactional`注解只能应用到 **public** 方法上，否则不会生效。如果这个注解使用在类上的话，表明该注解对该类中所有的 **public** 方法都生效。
+
+最后的总结：
+- `@Transactional` 注解只有作用到 public 方法上事务才生效，不推荐在接口上使用；
+- 避免同一个类中调用 `@Transactional` 注解的方法，这样会导致事务失效；
+- 正确的设置 `@Transactional` 的 `rollbackFor` 和 `propagation` 属性，否则事务可能会回滚失败;
+- 被 `@Transactional` 注解的方法所在的类必须被 Spring 管理，否则不生效；
+- 底层使用的数据库必须支持事务机制，否则不生效；
