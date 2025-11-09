@@ -335,6 +335,14 @@ public interface TransactionDefinition {
 @Transactional(rollbackFor= MyException.class)
 ```
 
+
+> [!WARNING] 注意！
+> 如果项目中定义并使用了全局异常处理器`@ExceptionHandler`，那么异常会被捕获且默认不再上抛，然后事务会直接提交！如需回滚，则需额外设置`setRollbackOnly()`：
+> ```java
+TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+> ```
+
+
 ## 5. `@Transactional`注解使用
 
 通常将`@Transactional`应用在具体方法上，不推荐在接口上使用。
