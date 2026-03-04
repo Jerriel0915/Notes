@@ -1,5 +1,5 @@
-- [ ] 《Spring实战 第4版》
-- [ ] 《MySQL 必知必会》
+- [x] 《Spring实战 第4版》
+- [x] 《MySQL 必知必会》
 - [ ] LangChain4J 学习了解
 - [ ] Redis 缓存相关
 - [x] GO 基础
