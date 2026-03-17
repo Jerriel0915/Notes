@@ -20,6 +20,7 @@
 - **拉取更新**：`git pull`（同步远程代码到本地）。
 - **推送代码**：`git push origin <分支名>`。
 - **查看远程库**：`git remote -v`。
+- **新增远程库**：`git remote add [-options] <repoName> <repoURL>`
 
 #### 5. 撤销与“后悔药”
 - **放弃工作区修改**：`git checkout -- <文件名>`。
