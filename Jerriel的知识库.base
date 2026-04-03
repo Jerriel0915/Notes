@@ -1,3 +1,5 @@
+formulas:
+  未命名: ""
 views:
   - type: table
     name: 表格
@@ -11,4 +13,6 @@ views:
       - file.ctime
       - file.mtime
       - file.tags
+      - file.folder
+      - formula.未命名
     sort: []
